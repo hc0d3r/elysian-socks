@@ -8,8 +8,13 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <unistd.h>
+#include <sys/time.h>
+#include <time.h>
 
 #include "elysian-socks.h"
+
+void set_socket_timeo(int, struct timeval *);
+void calculate_diff(struct timespec *, int, struct timeval *);
 
 void elysian_socks_init(elysian_socks_t *es){
     memset(es, 0x0, sizeof(elysian_socks_t));
@@ -49,6 +54,14 @@ void elysian_socks_setopt(elysian_socks_t *es, int opt, ...){
         case ES_AUTHDATA:
             es->authdata = va_arg(args, void *);
         break;
+
+        case ES_CONNECTION_TIMEOUT:
+            es->connection_timeout = va_arg(args, int);
+        break;
+
+        case ES_AUTH_TIMEOUT:
+            es->auth_timeout = va_arg(args, int);
+        break;
     }
 
     va_end(args);
@@ -58,6 +71,8 @@ int elysian_socks_auth(elysian_socks_t *es){
     int ret = 1;
     ssize_t len = 0;
     unsigned char response[4];
+    struct timeval tv;
+    struct timespec clock[2];
     char *buf;
 
     len = es->nmethods+2;
@@ -72,8 +87,28 @@ int elysian_socks_auth(elysian_socks_t *es){
     /* set auth methods */
     memcpy(buf+2, es->methods, es->nmethods);
 
-    if(send(es->conn, buf, len, MSG_NOSIGNAL) != len)
+
+    tv.tv_sec = es->auth_timeout;
+    tv.tv_usec = 0;
+
+    /* set timeout for recv and send */
+    set_socket_timeo(es->conn, &tv);
+
+    /* start count time */
+    clock_gettime(CLOCK_MONOTONIC, &clock[0]);
+
+    if(send(es->conn, buf, len, MSG_NOSIGNAL|MSG_WAITALL) != len)
         goto end;
+
+    /* stop count time */
+    clock_gettime(CLOCK_MONOTONIC, &clock[1]);
+
+    /* calculate how many time are left until timeout */
+    calculate_diff(clock, es->auth_timeout, &tv);
+
+    /* new timeout */
+    set_socket_timeo(es->conn, &tv);
+
 
     if(recv(es->conn, response, 3, MSG_NOSIGNAL) != 2)
         goto end;
@@ -96,6 +131,14 @@ int elysian_socks_auth(elysian_socks_t *es){
     ret = 0;
 
     end:
+
+    /* removing socket timeout */
+
+    tv.tv_sec = 0;
+    tv.tv_usec = 0;
+
+    set_socket_timeo(es->conn, &tv);
+
     free(buf);
     return ret;
 }
@@ -184,4 +227,29 @@ int elysian_socks_connect(elysian_socks_t *es){
     end:
     free(aux);
     return ret;
+}
+
+void calculate_diff(struct timespec *t, int timeout, struct timeval *tv){
+    struct timespec *start = t+1;
+    struct timespec *stop = t;
+    struct timespec diff;
+
+    stop->tv_sec += timeout;
+
+    if(stop->tv_nsec < start->tv_nsec){
+        diff.tv_sec = stop->tv_sec - start->tv_sec - 1;
+        diff.tv_nsec = stop->tv_nsec - start->tv_nsec + 1000000000UL;
+    } else {
+        diff.tv_sec = stop->tv_sec - start->tv_sec;
+        diff.tv_nsec = stop->tv_nsec - start->tv_nsec;
+    }
+
+    tv->tv_sec = diff.tv_sec;
+    tv->tv_usec = diff.tv_nsec/1000;
+
+}
+
+void set_socket_timeo(int fd, struct timeval *tv){
+    setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, tv, sizeof(struct timeval));
+    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, tv, sizeof(struct timeval));
 }

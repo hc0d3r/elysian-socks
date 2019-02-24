@@ -21,6 +21,9 @@ typedef struct elysian_socks {
     int raddrtype;
     void *raddr;
     unsigned short rport;
+
+    int connection_timeout;
+    int auth_timeout;
 } elysian_socks_t;
 
 enum {
@@ -31,7 +34,9 @@ enum {
     ES_IPV6,
     ES_AUTHTYPE,
     ES_AUTHCALLBACK,
-    ES_AUTHDATA
+    ES_AUTHDATA,
+    ES_CONNECTION_TIMEOUT,
+    ES_AUTH_TIMEOUT
 };
 
 void elysian_socks_init(elysian_socks_t *es);

@@ -46,6 +46,7 @@ int main(void){
     elysian_socks_setopt(&es, ES_IPV6, &ipv6);
     elysian_socks_setopt(&es, ES_PORT, 80);
     elysian_socks_setopt(&es, ES_AUTHTYPE, 0x0);
+    elysian_socks_setopt(&es, ES_AUTH_TIMEOUT, 5);
 
     setvbuf(stdout, NULL, _IONBF, 0);
 
@@ -72,10 +73,3 @@ int main(void){
 
     return 0;
 }
-
-
-
-
-
-
-//
