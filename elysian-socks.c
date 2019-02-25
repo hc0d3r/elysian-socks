@@ -146,6 +146,9 @@ int elysian_socks_auth(elysian_socks_t *es){
 int elysian_socks_connect(elysian_socks_t *es){
     char *aux, *buf, response[5], *dest_addr;
     size_t len = 6, addrlen = 0;
+    struct timeval tv;
+    struct timespec clock[2];
+
     int ret = 1;
 
     switch(es->addrtype){
@@ -189,11 +192,27 @@ int elysian_socks_connect(elysian_socks_t *es){
     /* set port */
     memcpy(buf+addrlen, &(es->port), 2);
 
+    tv.tv_sec = es->connection_timeout;
+    tv.tv_usec = 0;
+
+    set_socket_timeo(es->conn, &tv);
+
+    clock_gettime(CLOCK_MONOTONIC, &clock[0]);
+
     if(send(es->conn, aux, len, MSG_NOSIGNAL) != (ssize_t)len)
         goto end;
 
+    clock_gettime(CLOCK_MONOTONIC, &clock[1]);
+
+    calculate_diff(clock, &tv);
+    set_socket_timeo(es->conn, &tv);
+
+    clock_gettime(CLOCK_MONOTONIC, &clock[0]);
+
     if(recv(es->conn, response, 4, MSG_NOSIGNAL) != 4)
         goto end;
+
+    clock_gettime(CLOCK_MONOTONIC, &clock[1]);
 
     /* check version and status */
     if(response[0] != 5 || response[1] != 0)
@@ -213,6 +232,9 @@ int elysian_socks_connect(elysian_socks_t *es){
             goto end;
     }
 
+    calculate_diff(clock, &tv);
+    set_socket_timeo(es->conn, &tv);
+
     if(recv(es->conn, dest_addr, len, MSG_NOSIGNAL) != (ssize_t)len){
         free(dest_addr);
         goto end;
@@ -225,6 +247,12 @@ int elysian_socks_connect(elysian_socks_t *es){
     ret = 0;
 
     end:
+
+    tv.tv_sec = 0;
+    tv.tv_usec = 0;
+
+    set_socket_timeo(es->conn, &tv);
+
     free(aux);
     return ret;
 }
