@@ -14,7 +14,7 @@
 #include "elysian-socks.h"
 
 void set_socket_timeo(int, struct timeval *);
-void calculate_diff(struct timespec *, int, struct timeval *);
+void calculate_diff(struct timespec *, struct timeval *);
 
 void elysian_socks_init(elysian_socks_t *es){
     memset(es, 0x0, sizeof(elysian_socks_t));
@@ -104,7 +104,7 @@ int elysian_socks_auth(elysian_socks_t *es){
     clock_gettime(CLOCK_MONOTONIC, &clock[1]);
 
     /* calculate how many time are left until timeout */
-    calculate_diff(clock, es->auth_timeout, &tv);
+    calculate_diff(clock, &tv);
 
     /* new timeout */
     set_socket_timeo(es->conn, &tv);
@@ -229,12 +229,13 @@ int elysian_socks_connect(elysian_socks_t *es){
     return ret;
 }
 
-void calculate_diff(struct timespec *t, int timeout, struct timeval *tv){
+void calculate_diff(struct timespec *t, struct timeval *tv){
     struct timespec *start = t+1;
     struct timespec *stop = t;
     struct timespec diff;
 
-    stop->tv_sec += timeout;
+    stop->tv_sec += tv->tv_sec;
+    stop->tv_nsec += tv->tv_usec*1000;
 
     if(stop->tv_nsec < start->tv_nsec){
         diff.tv_sec = stop->tv_sec - start->tv_sec - 1;
