@@ -87,27 +87,30 @@ int elysian_socks_auth(elysian_socks_t *es){
     /* set auth methods */
     memcpy(buf+2, es->methods, es->nmethods);
 
+    if(es->auth_timeout){
+        tv.tv_sec = es->auth_timeout;
+        tv.tv_usec = 0;
 
-    tv.tv_sec = es->auth_timeout;
-    tv.tv_usec = 0;
+        /* set timeout for recv and send */
+        set_socket_timeo(es->conn, &tv);
 
-    /* set timeout for recv and send */
-    set_socket_timeo(es->conn, &tv);
-
-    /* start count time */
-    clock_gettime(CLOCK_MONOTONIC, &clock[0]);
+        /* start count time */
+        clock_gettime(CLOCK_MONOTONIC, &clock[0]);
+    }
 
     if(send(es->conn, buf, len, MSG_NOSIGNAL|MSG_WAITALL) != len)
         goto end;
 
-    /* stop count time */
-    clock_gettime(CLOCK_MONOTONIC, &clock[1]);
+    if(es->auth_timeout){
+        /* stop count time */
+        clock_gettime(CLOCK_MONOTONIC, &clock[1]);
 
-    /* calculate how many time are left until timeout */
-    calculate_diff(clock, &tv);
+        /* calculate how many time are left until timeout */
+        calculate_diff(clock, &tv);
 
-    /* new timeout */
-    set_socket_timeo(es->conn, &tv);
+        /* new timeout */
+        set_socket_timeo(es->conn, &tv);
+    }
 
 
     if(recv(es->conn, response, 3, MSG_NOSIGNAL) != 2)
@@ -133,11 +136,12 @@ int elysian_socks_auth(elysian_socks_t *es){
     end:
 
     /* removing socket timeout */
+    if(es->auth_timeout){
+        tv.tv_sec = 0;
+        tv.tv_usec = 0;
 
-    tv.tv_sec = 0;
-    tv.tv_usec = 0;
-
-    set_socket_timeo(es->conn, &tv);
+        set_socket_timeo(es->conn, &tv);
+    }
 
     free(buf);
     return ret;
@@ -192,27 +196,32 @@ int elysian_socks_connect(elysian_socks_t *es){
     /* set port */
     memcpy(buf+addrlen, &(es->port), 2);
 
-    tv.tv_sec = es->connection_timeout;
-    tv.tv_usec = 0;
+    if(es->connection_timeout){
+        tv.tv_sec = es->connection_timeout;
+        tv.tv_usec = 0;
 
-    set_socket_timeo(es->conn, &tv);
+        set_socket_timeo(es->conn, &tv);
 
-    clock_gettime(CLOCK_MONOTONIC, &clock[0]);
+        clock_gettime(CLOCK_MONOTONIC, &clock[0]);
+    }
 
     if(send(es->conn, aux, len, MSG_NOSIGNAL) != (ssize_t)len)
         goto end;
 
-    clock_gettime(CLOCK_MONOTONIC, &clock[1]);
+    if(es->connection_timeout){
+        clock_gettime(CLOCK_MONOTONIC, &clock[1]);
 
-    calculate_diff(clock, &tv);
-    set_socket_timeo(es->conn, &tv);
+        calculate_diff(clock, &tv);
+        set_socket_timeo(es->conn, &tv);
 
-    clock_gettime(CLOCK_MONOTONIC, &clock[0]);
+        clock_gettime(CLOCK_MONOTONIC, &clock[0]);
+    }
 
     if(recv(es->conn, response, 4, MSG_NOSIGNAL) != 4)
         goto end;
 
-    clock_gettime(CLOCK_MONOTONIC, &clock[1]);
+    if(es->connection_timeout)
+        clock_gettime(CLOCK_MONOTONIC, &clock[1]);
 
     /* check version and status */
     if(response[0] != 5 || response[1] != 0)
@@ -232,8 +241,10 @@ int elysian_socks_connect(elysian_socks_t *es){
             goto end;
     }
 
-    calculate_diff(clock, &tv);
-    set_socket_timeo(es->conn, &tv);
+    if(es->connection_timeout){
+        calculate_diff(clock, &tv);
+        set_socket_timeo(es->conn, &tv);
+    }
 
     if(recv(es->conn, dest_addr, len, MSG_NOSIGNAL) != (ssize_t)len){
         free(dest_addr);
@@ -248,10 +259,12 @@ int elysian_socks_connect(elysian_socks_t *es){
 
     end:
 
-    tv.tv_sec = 0;
-    tv.tv_usec = 0;
+    if(es->connection_timeout){
+        tv.tv_sec = 0;
+        tv.tv_usec = 0;
 
-    set_socket_timeo(es->conn, &tv);
+        set_socket_timeo(es->conn, &tv);
+    }
 
     free(aux);
     return ret;
