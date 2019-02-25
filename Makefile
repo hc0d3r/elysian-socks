@@ -1,7 +1,8 @@
-.PHONY: clean
+.PHONY: clean all
 
 CFLAGS=-Wall -Wextra -I.
 
+all: example
 
 elysian-socks.o: elysian-socks.c
 	$(CC) $(CFLAGS) -c $< -o $@
