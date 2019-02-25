@@ -47,6 +47,7 @@ int main(void){
     elysian_socks_setopt(&es, ES_PORT, 80);
     elysian_socks_setopt(&es, ES_AUTHTYPE, 0x0);
     elysian_socks_setopt(&es, ES_AUTH_TIMEOUT, 5);
+    elysian_socks_setopt(&es, ES_CONNECTION_TIMEOUT, 10);
 
     setvbuf(stdout, NULL, _IONBF, 0);
 
@@ -60,6 +61,7 @@ int main(void){
     printf("connecting... ");
     if(elysian_socks_connect(&es)){
         printf("error\n");
+        exit(1);
     }
 
     printf("ok\n");
